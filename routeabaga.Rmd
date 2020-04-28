@@ -1,0 +1,63 @@
+---
+title: "Routeabaga"
+subtitle: "Philly Cycling Route Repository"
+runtime: shiny
+output:
+  html_document:
+    css: routeabaga_css.css
+---
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet"> 
+</head>
+```{r, echo = F, message = F, warning = F}
+library(googlesheets4)
+library(dplyr)
+library(formattable)
+library(DT)
+
+# https://forms.gle/1BpoEaPLfWtG8csWA
+```
+
+#### [Submit a route here](https://forms.gle/1BpoEaPLfWtG8csWA) or check out the routes below
+
+</br>
+</br>
+
+```{r, echo=FALSE}
+
+fluidRow(column(4,
+                shiny::sliderInput("select_dist", label = "Filter Distance", min = 0, max = 500, value = c(0, 75), step = 5, post = " miles")
+                ),
+         column(4,
+                shiny::sliderInput("select_elev", label = "Filter Elevation", min = 0, max = 7000, value = c(0, 3000), step = 50, post = " feet")
+                )
+         )
+
+```
+
+```{r, echo = F, warning = F, message = F}
+routes <- read_sheet("https://docs.google.com/spreadsheets/d/1W-Qi9KaEJr-WJqIz1tJd8C5eLfFfnB5N8weN-1An4GY/edit#gid=1978301006")
+
+DT::renderDataTable(
+  
+  routes %>%
+    select(-1) %>%
+    mutate_if(is.double, as.numeric) %>%
+    mutate(`Route Link` = paste0("<a href='", `Route Link`,  "' target='_blank'> Go To Route </a>")) %>%
+    filter(`Distance (mi)` >= min(input$select_dist),
+           `Distance (mi)` <= max(input$select_dist),
+           `Elevation (ft)` >= min(input$select_elev),
+           `Elevation (ft)` <= max(input$select_elev),
+    ) %>%
+    DT::datatable(escape = F, rownames = F,
+                  options = list(
+                    initComplete = JS(
+                      "function(settings, json) {",
+                      "$('body').css({'font-family': 'Roboto'});",
+                      "}"
+                    )
+                  ))
+    )
+  
+```
+
