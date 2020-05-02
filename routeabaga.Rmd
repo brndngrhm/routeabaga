@@ -1,6 +1,6 @@
 ---
 title: "Routeabaga"
-subtitle: "Philly Cycling Route Repository"
+subtitle: "a crowdsourced philly cycling route repository"
 runtime: shiny
 output:
   html_document:
@@ -15,49 +15,84 @@ library(dplyr)
 library(formattable)
 library(DT)
 
-# https://forms.gle/1BpoEaPLfWtG8csWA
+#Put googlesheets4 into a de-authorized state
+gs4_deauth()
+
+
+routes <- read_sheet("https://docs.google.com/spreadsheets/d/1W-Qi9KaEJr-WJqIz1tJd8C5eLfFfnB5N8weN-1An4GY") %>%
+  mutate(`Any Gravel?` = ifelse(is.na(`Any Gravel?`), "Unsure", `Any Gravel?`)) %>%
+  filter(is.na(type))
+
+names(routes) <- stringr::str_to_lower(names(routes))
+
+max_mi <- max(routes$`distance (mi)`) + 200
+max_elev <- max(routes$`elevation (ft)`) + 1000
+              
 ```
 
-#### [Submit a route here](https://forms.gle/1BpoEaPLfWtG8csWA) or check out the routes below
 
-</br>
+#### Getting bored of doing the same rides? So is everyone else. [Submit a route here](https://forms.gle/1BpoEaPLfWtG8csWA) to share it, or check out the routes below
+
+*Please make sure the route is __public__ so others can see it (you can have a public route even if your profile is set to private)*
+
 </br>
 
 ```{r, echo=FALSE}
 
 fluidRow(column(4,
-                shiny::sliderInput("select_dist", label = "Filter Distance", min = 0, max = 500, value = c(0, 75), step = 5, post = " miles")
+                shiny::sliderInput("select_dist", label = "distance", min = 0, max = max_mi, value = c(0,  max_mi), step = 5, post = " miles")
                 ),
          column(4,
-                shiny::sliderInput("select_elev", label = "Filter Elevation", min = 0, max = 7000, value = c(0, 3000), step = 50, post = " feet")
+                shiny::sliderInput("select_elev", label = "elevation", min = 0, max =max_elev, value = c(0, max_elev), step = 50, post = " feet")
+                ),
+          column(4,
+                shiny::radioButtons("select_grav", label = "show routes with gravel?",
+                                    choices =  c("yes", "no"),
+                                    selected = "yes",
+                                    inline = F)
                 )
          )
 
 ```
 
 ```{r, echo = F, warning = F, message = F}
-routes <- read_sheet("https://docs.google.com/spreadsheets/d/1W-Qi9KaEJr-WJqIz1tJd8C5eLfFfnB5N8weN-1An4GY/edit#gid=1978301006")
 
-DT::renderDataTable(
+DT::renderDataTable({
   
-  routes %>%
+  prep <- if(input$select_grav == "yes"){
+    
+    routes 
+    
+  } else {
+    
+    routes %>% filter(`any gravel?` == "No")
+}
+
+  routes <- prep %>%
     select(-1) %>%
     mutate_if(is.double, as.numeric) %>%
-    mutate(`Route Link` = paste0("<a href='", `Route Link`,  "' target='_blank'> Go To Route </a>")) %>%
-    filter(`Distance (mi)` >= min(input$select_dist),
-           `Distance (mi)` <= max(input$select_dist),
-           `Elevation (ft)` >= min(input$select_elev),
-           `Elevation (ft)` <= max(input$select_elev),
+    mutate(`route link` = paste0("<a href='", `route link`,  "' target='_blank'> go to route </a>")) %>%
+    filter(`distance (mi)` >= min(input$select_dist),
+           `distance (mi)` <= max(input$select_dist),
+           `elevation (ft)` >= min(input$select_elev),
+           `elevation (ft)` <= max(input$select_elev),
     ) %>%
-    DT::datatable(escape = F, rownames = F,
+    select(`route name`:`elevation (ft)`, `any gravel?`, `route link`)
+  
+  
+    DT::datatable(routes,
+                  escape = F, rownames = F,
                   options = list(
                     initComplete = JS(
                       "function(settings, json) {",
                       "$('body').css({'font-family': 'Roboto'});",
                       "}"
-                    )
+                    ),
+                     columnDefs = list(list(width = '75%', targets = list(1))),
+                    pageLength = nrow(routes)
                   ))
-    )
+})
   
 ```
 
+questions? contact routeabaga@gmail.com
